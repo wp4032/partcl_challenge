@@ -30,6 +30,8 @@ Also, if you think there are any bugs in the provided code, please feel free to 
 
 PS: There are two entries because those were my two best results.
 
+My code is in the "full-code" branch
+
 > **To add your results:**  
 > Insert a new row in the table above with your name, overlap, wirelength, and any notes.
 
