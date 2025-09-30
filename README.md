@@ -24,14 +24,15 @@ Note: You can use any libraries or frameworks you like, but please ensure that y
 Also, if you think there are any bugs in the provided code, feel free to fix them and mention the changes in your submission.  
 
 
-## Leaderboard
+## Leaderboard (sorted by overlap)
 
 | Rank | Name            | Overlap     | Wirelength (um) | Runtime (s) | Notes                |
 |------|-----------------|-------------|-----------------|-------------|----------------------|
-| 1    | partcl baseline | 0.8         | 0.4             | 5           | Baseline solution    |
-| 2    | *Add yours!*    |             |                 |             |                      |
+| 1    | Prithvi Seran   | 0.0499      | 0.4890          | 398.58      |                      |
+| 2    | partcl example  | 0.8         | 0.4             | 5           | example              |
+| 3    | Add Yours!      |             |                 |             |                      |
 
 > **To add your results:**  
-> Insert a new row in the table above with your name, overlap, wirelength, and any notes.
+> Insert a new row in the table above with your name, overlap, wirelength, and any notes. Ensure you sort by overlap.
 
 Good luck!
