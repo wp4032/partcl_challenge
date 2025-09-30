@@ -284,7 +284,7 @@ def wirelength_attraction_loss(cell_features, pin_features, edge_list):
 
     # Calculate smooth approximation of Manhattan distance
     # Using log-sum-exp approximation for differentiability
-    alpha = 0.1  # Smoothing parameter
+    alpha = 0.02  # Smoothing parameter
     dx = torch.abs(src_x - tgt_x)
     dy = torch.abs(src_y - tgt_y)
 
@@ -343,21 +343,86 @@ def overlap_repulsion_loss(cell_features, pin_features, edge_list):
     Returns:
         Scalar loss value (should be 0 when no overlaps exist)
     """
-    N = cell_features.shape[0]
-    if N <= 1:
-        return torch.tensor(0.0, requires_grad=True)
 
-    # TODO: Implement overlap detection and loss calculation here
-    #
-    # Your implementation should:
-    # 1. Extract cell positions, widths, and heights
-    # 2. Compute pairwise overlaps using vectorized operations
-    # 3. Return a scalar loss that is zero when no overlaps exist
-    #
-    # Delete this placeholder and add your implementation:
+    import torch
+    
+    eps = 1e-8
+    
+    positions = cell_features[:, 2:4]
+    widths = cell_features[:, 4]
+    heights = cell_features[:, 5]
+    areas = cell_features[:, 0]
+    
+    N = positions.size(0)
+    
+    if N < 2:
+        return torch.tensor(0.0, device=cell_features.device, requires_grad=True)
+    
+    # Broadcast positions for pairwise comparisons
+    pos_i = positions.unsqueeze(1)  # [N, 1, 2]
+    pos_j = positions.unsqueeze(0)  # [1, N, 2]
+    delta = (pos_i - pos_j).abs()   # [N, N, 2]
+    
+    # Broadcast dimensions
+    w_i = widths.unsqueeze(1)
+    w_j = widths.unsqueeze(0)
+    h_i = heights.unsqueeze(1)
+    h_j = heights.unsqueeze(0)
+    
+    area_i = areas.unsqueeze(1)
+    area_j = areas.unsqueeze(0)
+    min_area = torch.minimum(area_i, area_j)
+    
+    # Only penalize when cells actually overlap, not when they're close
+    overlap_x = torch.relu((w_i + w_j) / 2.0 - delta[:, :, 0])
+    overlap_y = torch.relu((h_i + h_j) / 2.0 - delta[:, :, 1])
+    overlap_area = overlap_x * overlap_y
+    
+    # Normalize by smaller cell area
+    relative_overlap = overlap_area / (min_area + eps)
+    
+    # Only consider upper triangle to avoid double counting
+    mask = torch.triu(torch.ones(N, N, device=cell_features.device), diagonal=1)
+    
+    overlap_count = ((overlap_area * mask) > eps).float().sum()
+    
+    # Smooth indicator for overlaps (differentiable counting)
+    k = 50.0  # Moderate steepness for stability
+    overlap_indicator = torch.sigmoid(k * relative_overlap)
+    
+    # Different strategies based on number of overlaps
+    if overlap_count == 0:
+        # No overlaps - return zero loss
+        return torch.tensor(0.0, device=cell_features.device, requires_grad=True)
+    
+    elif overlap_count <= 3:
+        # Very few overlaps: aggressive penalty to eliminate them
+        # Use high power to strongly penalize even small overlaps
+        penalty = (relative_overlap ** 1.5 * mask).sum() * 1000.0
+        count_penalty = (overlap_indicator * mask).sum() * 500.0
+        total_loss = penalty + count_penalty
+        
+    elif overlap_count <= 10:
+        # Few overlaps: strong penalty
+        penalty = (relative_overlap ** 1.5 * mask).sum() * 500.0
+        count_penalty = (overlap_indicator * mask).sum() * 200.0
+        total_loss = penalty + count_penalty
+        
+    elif overlap_count <= 30:
+        # Moderate overlaps: balanced approach
+        penalty = (relative_overlap ** 2 * mask).sum() * 200.0
+        count_penalty = (overlap_indicator * mask).sum() * 100.0
+        total_loss = penalty + count_penalty
+        
+    else:
+        # Many overlaps: gentler penalty (let system organize)
+        # Use quadratic to provide smooth gradients
+        penalty = (relative_overlap ** 2 * mask).sum() * 100.0
+        count_penalty = (overlap_indicator * mask).sum() * 50.0
+        total_loss = penalty + count_penalty
+    
+    return total_loss
 
-    # Placeholder - returns a constant loss (REPLACE THIS!)
-    return torch.tensor(1.0, requires_grad=True)
 
 
 def train_placement(
@@ -759,7 +824,10 @@ def main():
         pin_features,
         edge_list,
         verbose=True,
+        num_epochs = 15500,
         log_interval=200,
+        lambda_wirelength=7,
+        lambda_overlap=80.0
     )
 
     # Calculate final metrics (both detailed and normalized)
