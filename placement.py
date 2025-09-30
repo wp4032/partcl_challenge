@@ -352,22 +352,26 @@ def overlap_repulsion_loss(cell_features, pin_features, edge_list):
     dims_i, dims_j = cell_dims.unsqueeze(1), cell_dims.unsqueeze(0)
 
     distances = torch.abs(positions_i - positions_j)
-    overlaps = torch.relu((dims_i+dims_j)/2 - distances)
+    overlaps = torch.relu((dims_i + dims_j) / 2 - distances)
 
-    overlap_area = torch.mul(overlaps[:,:,0], overlaps[:,:,1])
-    overlap_area = torch.triu(overlap_area, diagonal=1).sum()
-    
-    return overlap_area / (N*(N-1)/2.0)
+    overlap_area = overlaps[:, :, 0] * overlaps[:, :, 1]
+    pair_areas = (dims_i[:, :, 0] * dims_i[:, :, 1] + dims_j[:, :, 0] * dims_j[:, :, 1]) / 2
+    # Normalize overlap area so it penalizes std cell to std cell overlap more given small size of std cell 
+    normalized_overlap_area = overlap_area / pair_areas
+
+    normalized_overlap_area = torch.triu(normalized_overlap_area, diagonal=1).sum()
+
+    return normalized_overlap_area
 
 
 def train_placement(
     cell_features,
     pin_features,
     edge_list,
-    num_epochs=30000,
-    lr=0.01,
+    num_epochs=10000,
+    lr=0.05,
     lambda_wirelength=1.0,
-    lambda_overlap=10.0,
+    lambda_overlap=1000.0,
     verbose=True,
     log_interval=100,
 ):
