@@ -25,12 +25,10 @@ Also, if you think there are any bugs in the provided code, please feel free to 
 | Rank | Name            | Overlap     | Wirelength (um) | Runtime (s) | Notes                |
 |------|-----------------|-------------|-----------------|-------------|----------------------|
 | 1    | partcl baseline | 0.8         | 0.4             | 5           | Baseline solution    |
-| 2    | Prithvi Seran   | 0.0651      | 0.4596          | 992.84      | Almost all the time was taken up by the last test (took 870 seconds)|
+| 2    | Prithvi Seran   | 0.0499      | 0.4890          | 398.58      |                      |
 
 > **To add your results:**  
 > Insert a new row in the table above with your name, overlap, wirelength, and any notes.
 
-## How to access my submission
-My code is available in the fork :)
 
 Good luck!
