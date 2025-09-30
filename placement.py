@@ -344,27 +344,27 @@ def overlap_repulsion_loss(cell_features, pin_features, edge_list):
         Scalar loss value (should be 0 when no overlaps exist)
     """
     N = cell_features.shape[0]
+    cell_positions, cell_dims = cell_features[:, 2:4], cell_features[:, 4:]
     if N <= 1:
         return torch.tensor(0.0, requires_grad=True)
 
-    # TODO: Implement overlap detection and loss calculation here
-    #
-    # Your implementation should:
-    # 1. Extract cell positions, widths, and heights
-    # 2. Compute pairwise overlaps using vectorized operations
-    # 3. Return a scalar loss that is zero when no overlaps exist
-    #
-    # Delete this placeholder and add your implementation:
+    positions_i, positions_j = cell_positions.unsqueeze(1), cell_positions.unsqueeze(0)
+    dims_i, dims_j = cell_dims.unsqueeze(1), cell_dims.unsqueeze(0)
 
-    # Placeholder - returns a constant loss (REPLACE THIS!)
-    return torch.tensor(1.0, requires_grad=True)
+    distances = torch.abs(positions_i - positions_j)
+    overlaps = torch.relu((dims_i+dims_j)/2 - distances)
+
+    overlap_area = torch.mul(overlaps[:,:,0], overlaps[:,:,1])
+    overlap_area = torch.triu(overlap_area, diagonal=1).sum()
+    
+    return overlap_area / (N*(N-1)/2.0)
 
 
 def train_placement(
     cell_features,
     pin_features,
     edge_list,
-    num_epochs=1000,
+    num_epochs=30000,
     lr=0.01,
     lambda_wirelength=1.0,
     lambda_overlap=10.0,
