@@ -6,7 +6,7 @@ This script runs the placement optimizer on 10 randomly generated netlists
 of various sizes and reports metrics for leaderboard submission.
 
 Usage:
-    python test.py
+    python test_placement.py
 
 Metrics Reported:
     - Average Overlap: (num cells with overlaps / total num cells)
@@ -93,11 +93,7 @@ def run_placement_test(
         cell_features,
         pin_features,
         edge_list,
-        verbose=True,
-        num_epochs = 15500,
-        log_interval=200,
-        lambda_wirelength=7,
-        lambda_overlap=80.0
+        verbose=False,  # Suppress per-epoch output
     )
     elapsed_time = time.time() - start_time
 
