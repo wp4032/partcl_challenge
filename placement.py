@@ -43,6 +43,7 @@ from enum import IntEnum
 
 import torch
 import torch.optim as optim
+from tqdm import tqdm
 
 
 # Feature index enums for cleaner code access
@@ -368,7 +369,7 @@ def train_placement(
     cell_features,
     pin_features,
     edge_list,
-    num_epochs=10000,
+    num_epochs=2000,
     lr=0.05,
     lambda_wirelength=1.0,
     lambda_overlap=1000.0,
@@ -412,8 +413,9 @@ def train_placement(
         "overlap_loss": [],
     }
 
-    # Training loop
-    for epoch in range(num_epochs):
+    # Training loop with progress bar
+    early_stop = False
+    for epoch in tqdm(range(num_epochs), desc="Training Progress", unit="epoch"):
         optimizer.zero_grad()
 
         # Create cell_features with current positions
@@ -445,21 +447,35 @@ def train_placement(
         loss_history["wirelength_loss"].append(wl_loss.item())
         loss_history["overlap_loss"].append(overlap_loss.item())
 
-        # Log progress
+        # Log progress and check for early stopping
         if verbose and (epoch % log_interval == 0 or epoch == num_epochs - 1):
             print(f"Epoch {epoch}/{num_epochs}:")
             print(f"  Total Loss: {total_loss.item():.6f}")
             print(f"  Wirelength Loss: {wl_loss.item():.6f}")
             print(f"  Overlap Loss: {overlap_loss.item():.6f}")
+        
+        # Check for early stopping every log_interval epochs
+        if epoch % log_interval == 0 and epoch > 0:
+            cells_with_overlaps = calculate_cells_with_overlaps(cell_features_current)
+            if len(cells_with_overlaps) == 0:
+                if verbose:
+                    print(f"Early stopping at epoch {epoch}: All overlaps eliminated!")
+                early_stop = True
+                break
 
     # Create final cell features
     final_cell_features = cell_features.clone()
     final_cell_features[:, 2:4] = cell_positions.detach()
 
+    if verbose and not early_stop:
+        print(f"\nCompleted all {num_epochs} epochs")
+
     return {
         "final_cell_features": final_cell_features,
         "initial_cell_features": initial_cell_features,
         "loss_history": loss_history,
+        "early_stop": early_stop,
+        "epochs_trained": epoch + 1,
     }
 
 
@@ -770,6 +786,12 @@ def main():
     print("\n" + "=" * 70)
     print("FINAL RESULTS")
     print("=" * 70)
+    
+    if result.get("early_stop", False):
+        print(f"Training stopped early at epoch {result['epochs_trained']}")
+    else:
+        print(f"Training completed all {result['epochs_trained']} epochs")
+    print()
 
     final_cell_features = result["final_cell_features"]
 
