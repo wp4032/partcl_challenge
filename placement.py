@@ -347,7 +347,7 @@ def overlap_repulsion_loss(cell_features, pin_features, edge_list):
     """
     N = cell_features.shape[0]
     cell_positions, cell_dims = cell_features[:, 2:4], cell_features[:, 4:]
-    margin = 0.2
+    margin = 0.05
     if N <= 1:
         return torch.tensor(0.0, requires_grad=True)
 
@@ -374,9 +374,10 @@ def train_placement(
     num_epochs=2000,
     lr=0.5,
     lambda_wirelength=1.0,
-    lambda_overlap=1000.0,
+    lambda_overlap=10.0,
     verbose=True,
     log_interval=100,
+    early_stop=False,
 ):
     """Train the placement optimization using gradient descent.
 
@@ -462,7 +463,7 @@ def train_placement(
             print(f"  Overlap Loss: {overlap_loss.item():.6f}")
         
         # Check for early stopping every log_interval epochs
-        if epoch % log_interval == 0 and epoch > 0:
+        if early_stop and epoch % log_interval == 0 and epoch > 0:
             cells_with_overlaps = calculate_cells_with_overlaps(cell_features_current)
             if len(cells_with_overlaps) == 0:
                 if verbose:
@@ -766,6 +767,34 @@ def plot_placement(
                     horizontalalignment='left',
                     verticalalignment='bottom',
                     color='red')
+            
+            # Update absolute pin positions based on cell positions
+            cell_positions = cell_features[:, 2:4]  # [N, 2]
+            cell_widths = cell_features[:, CellFeatureIdx.WIDTH]  # [N]
+            cell_heights = cell_features[:, CellFeatureIdx.HEIGHT]  # [N]
+            cell_indices = pin_features[:, 0].long()
+
+            # Calculate absolute pin positions
+            pin_absolute_x = cell_positions[cell_indices, 0] - cell_widths[cell_indices] / 2 + pin_features[:, PinFeatureIdx.PIN_X]
+            pin_absolute_y = cell_positions[cell_indices, 1] - cell_heights[cell_indices] / 2 + pin_features[:, PinFeatureIdx.PIN_Y]
+
+            # Draw pins
+            for i in range(pin_absolute_x.shape[0]):
+                pin_rect = Rectangle(
+                    (pin_absolute_x[i] - 0.25, pin_absolute_y[i] - 0.25),
+                    0.5,
+                    0.5,
+                    fill=True,
+                    facecolor='black',
+                )
+                ax.add_patch(pin_rect)
+
+            # Draw lines between pins
+            for edge in edge_list:
+                src_pin, tgt_pin = edge.long()
+                ax.plot([pin_absolute_x[src_pin].item(), pin_absolute_x[tgt_pin].item()],
+                       [pin_absolute_y[src_pin].item(), pin_absolute_y[tgt_pin].item()],
+                       'k-', linewidth=0.5, alpha=0.1)
 
         plt.tight_layout()
         output_path = os.path.join(OUTPUT_DIR, filename)
