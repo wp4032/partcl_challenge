@@ -374,10 +374,11 @@ def train_placement(
     num_epochs=2000,
     lr=0.5,
     lambda_wirelength=1.0,
-    lambda_overlap=10.0,
+    lambda_overlap=50.0,
     verbose=True,
     log_interval=100,
-    early_stop=False,
+    early_stop_option=False,
+    visualize=False,
 ):
     """Train the placement optimization using gradient descent.
 
@@ -418,8 +419,10 @@ def train_placement(
     }
 
     initial_lambda_wirelength = lambda_wirelength
-    # Training loop with progress bar
+    layout_history = []
+    
     early_stop = False
+    # Training loop with progress bar
     for epoch in tqdm(range(num_epochs), desc="Training Progress", unit="epoch"):
         optimizer.zero_grad()
 
@@ -435,10 +438,27 @@ def train_placement(
             cell_features_current, pin_features, edge_list
         )
 
-        lambda_wirelength = initial_lambda_wirelength * (0.998 ** epoch)
+        # Smooth phased schedule
+        phase_1_end = 10
+        phase_2_end = 300
 
-        # Combined loss
-        total_loss = lambda_wirelength * wl_loss + lambda_overlap * overlap_loss
+        if epoch < phase_1_end:
+            # Phase 1: Overlap-focused
+            wl_weight = 1.0
+            overlap_weight = 10000.0
+        elif epoch < phase_2_end:
+            # Phase 2: Wirelength-focused
+            wl_weight = 10000.0
+            overlap_weight = 1.0
+        else:
+            # Phase 3: Back to overlap-focused
+            wl_weight = 1.0
+            overlap_weight = 10000.0
+
+        lambda_wl_current = initial_lambda_wirelength * wl_weight
+        lambda_overlap_current = lambda_overlap * overlap_weight
+
+        total_loss = lambda_wl_current * wl_loss + lambda_overlap_current * overlap_loss
 
         # Backward pass
         total_loss.backward()
@@ -463,17 +483,25 @@ def train_placement(
             print(f"  Overlap Loss: {overlap_loss.item():.6f}")
         
         # Check for early stopping every log_interval epochs
-        if early_stop and epoch % log_interval == 0 and epoch > 0:
-            cells_with_overlaps = calculate_cells_with_overlaps(cell_features_current)
-            if len(cells_with_overlaps) == 0:
-                if verbose:
-                    print(f"Early stopping at epoch {epoch}: All overlaps eliminated!")
-                early_stop = True
-                break
+        if epoch % log_interval == 0 and epoch > 0:
+            if visualize:
+                layout_history.append(cell_features_current.clone().detach())
+            if early_stop_option:
+                cells_with_overlaps = calculate_cells_with_overlaps(cell_features_current)
+                if len(cells_with_overlaps) == 0:
+                    if verbose:
+                        print(f"Early stopping at epoch {epoch}: All overlaps eliminated!")
+                    early_stop = True
+                    break
 
     # Create final cell features
     final_cell_features = cell_features.clone()
     final_cell_features[:, 2:4] = cell_positions.detach()
+
+    if visualize:
+        for i, layout in enumerate(layout_history):
+            epoch = (i+1) * log_interval
+            plot_placement(initial_cell_features, layout, pin_features, edge_list, f"placement_result_{epoch}.png", epoch=epoch)
 
     if verbose and not early_stop:
         print(f"\nCompleted all {num_epochs} epochs")
@@ -684,6 +712,7 @@ def plot_placement(
     pin_features,
     edge_list,
     filename="placement_result.png",
+    epoch=None,
 ):
     """Create side-by-side visualization of initial vs final placement.
 
@@ -701,14 +730,16 @@ def plot_placement(
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 8))
 
         # Plot both initial and final placements
+        subtitle = "" if epoch is None else f"Epoch {epoch}"
+
         for ax, cell_features, title in [
-            (ax1, initial_cell_features, "Initial Placement"),
-            (ax2, final_cell_features, "Final Placement"),
+            (ax1, initial_cell_features, f"Initial Placement"),
+            (ax2, final_cell_features, f"Final Placement {subtitle}"),
         ]:
             N = cell_features.shape[0]
-            positions = cell_features[:, 2:4].detach().numpy()
-            widths = cell_features[:, 4].detach().numpy()
-            heights = cell_features[:, 5].detach().numpy()
+            positions = cell_features[:, 2:4]
+            widths = cell_features[:, 4]
+            heights = cell_features[:, 5]
 
             # Draw cells
             for i in range(N):
