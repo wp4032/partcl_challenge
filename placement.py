@@ -44,6 +44,7 @@ from enum import IntEnum
 import torch
 import torch.optim as optim
 from tqdm import tqdm
+import numpy as np
 
 
 # Feature index enums for cleaner code access
@@ -346,6 +347,7 @@ def overlap_repulsion_loss(cell_features, pin_features, edge_list):
     """
     N = cell_features.shape[0]
     cell_positions, cell_dims = cell_features[:, 2:4], cell_features[:, 4:]
+    margin = 0.1
     if N <= 1:
         return torch.tensor(0.0, requires_grad=True)
 
@@ -353,9 +355,9 @@ def overlap_repulsion_loss(cell_features, pin_features, edge_list):
     dims_i, dims_j = cell_dims.unsqueeze(1), cell_dims.unsqueeze(0)
 
     distances = torch.abs(positions_i - positions_j)
-    overlaps = torch.relu((dims_i + dims_j) / 2 - distances)
+    overlaps = torch.relu((dims_i + dims_j) / 2 - distances + margin)
 
-    overlap_area = overlaps[:, :, 0] * overlaps[:, :, 1]
+    overlap_area = overlaps[:, :, 0] ** 2 * overlaps[:, :, 1] ** 2
     pair_areas = (dims_i[:, :, 0] * dims_i[:, :, 1] + dims_j[:, :, 0] * dims_j[:, :, 1]) / 2
     # Normalize overlap area so it penalizes std cell to std cell overlap more given small size of std cell 
     normalized_overlap_area = overlap_area / pair_areas
@@ -370,7 +372,7 @@ def train_placement(
     pin_features,
     edge_list,
     num_epochs=2000,
-    lr=0.05,
+    lr=0.1,
     lambda_wirelength=1.0,
     lambda_overlap=1000.0,
     verbose=True,
@@ -567,32 +569,33 @@ def calculate_cells_with_overlaps(cell_features):
     if N <= 1:
         return set()
 
-    # Extract cell properties
+    # Extract cell properties 
     positions = cell_features[:, 2:4].detach().numpy()
     widths = cell_features[:, 4].detach().numpy()
     heights = cell_features[:, 5].detach().numpy()
 
     cells_with_overlaps = set()
 
-    # Check all pairs
+    # Compute bounds for each cell
+    x_min = positions[:, 0] - widths/2
+    x_max = positions[:, 0] + widths/2
+    y_min = positions[:, 1] - heights/2 
+    y_max = positions[:, 1] + heights/2
+
+    # Check all pairs more efficiently
     for i in range(N):
-        for j in range(i + 1, N):
-            # Calculate center-to-center distances
-            dx = abs(positions[i, 0] - positions[j, 0])
-            dy = abs(positions[i, 1] - positions[j, 1])
-
-            # Minimum separation for non-overlap
-            min_sep_x = (widths[i] + widths[j]) / 2
-            min_sep_y = (heights[i] + heights[j]) / 2
-
-            # Calculate overlap amounts
-            overlap_x = max(0, min_sep_x - dx)
-            overlap_y = max(0, min_sep_y - dy)
-
-            # Overlap occurs only if both x and y overlap
-            if overlap_x > 0 and overlap_y > 0:
-                cells_with_overlaps.add(i)
-                cells_with_overlaps.add(j)
+        # Early exit if i already has overlaps
+        if i in cells_with_overlaps:
+            continue
+            
+        # Vectorized overlap check with remaining cells
+        overlaps_x = (x_min[i] < x_max[i+1:]) & (x_max[i] > x_min[i+1:])
+        overlaps_y = (y_min[i] < y_max[i+1:]) & (y_max[i] > y_min[i+1:])
+        overlaps = overlaps_x & overlaps_y
+        
+        if overlaps.any():
+            cells_with_overlaps.add(i)
+            cells_with_overlaps.update(np.where(overlaps)[0] + i + 1)
 
     return cells_with_overlaps
 
