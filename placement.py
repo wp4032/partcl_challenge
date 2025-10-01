@@ -347,7 +347,7 @@ def overlap_repulsion_loss(cell_features, pin_features, edge_list):
     """
     N = cell_features.shape[0]
     cell_positions, cell_dims = cell_features[:, 2:4], cell_features[:, 4:]
-    margin = 0.1
+    margin = 0.2
     if N <= 1:
         return torch.tensor(0.0, requires_grad=True)
 
@@ -372,7 +372,7 @@ def train_placement(
     pin_features,
     edge_list,
     num_epochs=2000,
-    lr=0.1,
+    lr=0.5,
     lambda_wirelength=1.0,
     lambda_overlap=1000.0,
     verbose=True,
@@ -407,6 +407,7 @@ def train_placement(
 
     # Create optimizer
     optimizer = optim.Adam([cell_positions], lr=lr)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=100)
 
     # Track loss history
     loss_history = {
@@ -415,6 +416,7 @@ def train_placement(
         "overlap_loss": [],
     }
 
+    initial_lambda_wirelength = lambda_wirelength
     # Training loop with progress bar
     early_stop = False
     for epoch in tqdm(range(num_epochs), desc="Training Progress", unit="epoch"):
@@ -432,6 +434,8 @@ def train_placement(
             cell_features_current, pin_features, edge_list
         )
 
+        lambda_wirelength = initial_lambda_wirelength * (0.998 ** epoch)
+
         # Combined loss
         total_loss = lambda_wirelength * wl_loss + lambda_overlap * overlap_loss
 
@@ -443,6 +447,7 @@ def train_placement(
 
         # Update positions
         optimizer.step()
+        scheduler.step(overlap_loss)  # Update learning rate
 
         # Record losses
         loss_history["total_loss"].append(total_loss.item())
