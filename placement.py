@@ -617,8 +617,8 @@ def calculate_normalized_metrics(cell_features, pin_features, edge_list):
     core_area = (max_x - min_x) * (max_y - min_y)
 
     # Calculate core utilization: (std cell + macro area) / core area
-    std_cell_area = cell_features[:, CellFeatureIdx.AREA].sum().item()
-    core_utilization = (std_cell_area) / core_area if core_area > 0 else 0.0
+    std_macro_area = cell_features[:, CellFeatureIdx.AREA].sum().item()
+    core_utilization = (std_macro_area) / core_area if core_area > 0 and overlap_ratio == 0.0 else float('nan')
 
     # Calculate wirelength metric: (wirelength / num nets) / sqrt(total area)
     if edge_list.shape[0] == 0:
@@ -763,7 +763,7 @@ def main():
 
     # Generate placement problem
     num_macros = 3
-    num_std_cells = 2
+    num_std_cells = 50
 
     print(f"Generating placement problem:")
     print(f"  - {num_macros} macros")
