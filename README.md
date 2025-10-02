@@ -33,8 +33,8 @@ We will review submissions on a rolling basis.
 | Rank | Name            | Overlap     | Wirelength (um) | Runtime (s) | Notes                |
 |------|-----------------|-------------|-----------------|-------------|----------------------|
 | 1    | Leison Gao      | 0.0000      | 0.2796          | 50.14s      |                      |
-| 2    | Ashmit Dutta    | 0.0000      | 0.2870          | 995.58      |  Spent my entire morning (12 am - 6 am) doing this :P       |
-| 3    | William Pan     | 0.0000      | 0.3094          | 142.83s     |                      |
+| 2    | William Pan     | 0.0000      | 0.2848          | 155.33s     |                      |
+| 3    | Ashmit Dutta    | 0.0000      | 0.2870          | 995.58      |  Spent my entire morning (12 am - 6 am) doing this :P       |
 | 3    | Aleksey  Valouev| 0.0000      | 0.3577          | 118.98      |                      |
 | 4    | Mohul Shukla    | 0.0000      | 0.5048          | 54.60s      |                      |
 | 5    | Ryan Hulke      | 0.0000      | 0.5226          | 166.24      |                      |
