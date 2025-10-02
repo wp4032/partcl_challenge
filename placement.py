@@ -440,7 +440,7 @@ def train_placement(
 
         # Smooth phased schedule
         phase_1_end = 10
-        phase_2_end = 300
+        phase_2_end = 500
 
         if epoch < phase_1_end:
             # Phase 1: Overlap-focused
